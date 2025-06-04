@@ -75,7 +75,6 @@ def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_pro
             change_threshold = random.randint(*change_interval)
 
         while True:
-        
             proxy_dict = {}
             if not tor_proxy and current_proxy:
                 proxy_dict = create_proxy_dict(current_proxy)
