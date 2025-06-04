@@ -73,28 +73,32 @@ def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_pro
             
             request_counter = 0
             change_threshold = random.randint(*change_interval)
+
+        while True:
         
-        proxy_dict = {}
-        if not tor_proxy and current_proxy:
-            proxy_dict = create_proxy_dict(current_proxy)
-        
-        response, proxy_is_failed = craft_request(full_url, delay, proxy_dict, get_random_user_agent())
-        request_counter += 1
-        
-        if proxy_is_failed:
-            if not tor_proxy and current_proxy in proxy_list:
-                proxy_list.remove(current_proxy)
-                if proxy_list:
-                    current_proxy = random.choice(proxy_list)
-                    request_counter = 0 
-                else:
-                    print("No more proxies available!")
-                    break
-            continue
-        
-        if dir not in legitimate and response.status_code != 404:
-            output_file.write(f"URL: {full_url} | Status: {response.status_code} | Text:\n{response.text}")
-            output_file.flush()
+            proxy_dict = {}
+            if not tor_proxy and current_proxy:
+                proxy_dict = create_proxy_dict(current_proxy)
+            
+            response, proxy_is_failed = craft_request(full_url, delay, proxy_dict, get_random_user_agent())
+            request_counter += 1
+            
+            if proxy_is_failed:
+                if not tor_proxy and current_proxy in proxy_list:
+                    proxy_list.remove(current_proxy)
+                    if proxy_list:
+                        current_proxy = random.choice(proxy_list)
+                        request_counter = 0 
+                    else:
+                        print("No more proxies available!")
+                        break
+            else:
+                break
+            
+            if dir not in legitimate and response.status_code != 404:
+                print("need save...")
+                output_file.write(f"URL: {full_url} | Status: {response.status_code} | Text:\n{response.text}")
+                output_file.flush()
     
     output_file.close()
 
