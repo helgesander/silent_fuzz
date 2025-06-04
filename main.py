@@ -4,9 +4,7 @@ import argparse
 import random
 import urllib3
 from UserAgenter import UserAgent
-from requests.exceptions import RequestException
-from utils.proxy import check_proxies_multithreaded
-from utils.tor import change_tor_ip, set_tor_proxy, launch_tor
+from requests_tor import RequestsTor
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -35,40 +33,42 @@ def create_proxy_dict(proxy_address):
 
 def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_proxy=False, change_interval=(5, 25)):
     directories = []
-    legitimate_counter = 0
     output_file = open(output, 'w')
+
     
     if len(legitimate) > 0:
-        for i in range(len(wordlist) // 4):
-            directories.append(legitimate[legitimate_counter % len(legitimate)])
-            directories.append(legitimate[(legitimate_counter + 1) % len(legitimate)])
-            directories.append(legitimate[(legitimate_counter + 2) % len(legitimate)])
-            directories.extend(random.sample(wordlist, 1))
-            legitimate_counter += 3
+        word_counter = 0
+        dir_counter = 0
+        while word_counter != len(wordlist):
+            if dir_counter % 4 > 0:
+                directories.append(random.choice(legitimate))
+            else:
+                directories.append(wordlist[word_counter])
+                word_counter += 1
+            dir_counter += 1
     else:
         directories.extend(wordlist)
-        directories.extend(random.sample(wordlist, len(wordlist) % 4))
     
     start_time = time.time()
     delay = None
     request_counter = 0
     change_threshold = random.randint(*change_interval)  
     
+    rt = None
+
     if tor_proxy:
-        set_tor_proxy()
+        rt = RequestsTor(tor_ports=(9050,), tor_cport=9051, password=None,
+                     autochange_id=10, threads=1)
         current_proxy = None
     else:
         current_proxy = random.choice(proxy_list) if proxy_list else None
     
-    for dir in directories:
-        full_url = f"{url}/{dir}"
+    for d in directories:
+        full_url = f"{url}/{d}"
         delay = random.choice(delay_range)
         
         if request_counter >= change_threshold:
-            if tor_proxy:
-                print("Set new IP via TOR!")
-                change_tor_ip()
-            elif proxy_list:
+            if proxy_list:
                 current_proxy = random.choice(proxy_list)
             
             request_counter = 0
@@ -79,7 +79,7 @@ def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_pro
             if not tor_proxy and current_proxy:
                 proxy_dict = create_proxy_dict(current_proxy)
             
-            response, proxy_is_failed = craft_request(full_url, delay, proxy_dict, get_random_user_agent())
+            response, proxy_is_failed = craft_request(rt, full_url, delay, proxy_dict, get_random_user_agent())
             request_counter += 1
             
             if proxy_is_failed:
@@ -94,16 +94,16 @@ def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_pro
             else:
                 break
             
-            if dir not in legitimate and response.status_code != 404:
-                print("need save...")
-                output_file.write(f"URL: {full_url} | Status: {response.status_code} | Text:\n{response.text}")
-                output_file.flush()
+            
+        if d not in legitimate and response.status_code != 404:
+            output_file.write(f"URL: {full_url} | Status: {response.status_code} | Text:\n{response.text}")
+            output_file.flush()
     
     output_file.close()
 
 
-def craft_request(url, delay, proxy, user_agent):
-    result_string = 'URL: {}'
+def craft_request(rt, url, delay, proxy, user_agent):
+    result_string = 'URL: {} | Status: {}'
     response = None
     proxy_failed = False
     
@@ -115,26 +115,29 @@ def craft_request(url, delay, proxy, user_agent):
                 proxies=proxy,
                 timeout=20 
             )
-            print((result_string + ' | Status: {} | Proxy: {}').format(
+            print((result_string + ' | Proxy: {}').format(
                 url, 
                 response.status_code, 
                 proxy['http'].split('socks5://')[1]
             ))
         else:
-            response = requests.get(
+            response = rt.get(
                 url,
                 headers={'User-Agent': user_agent},
                 timeout=20
             )
-            print((result_string + ' | Status: {}').format(url, response.status_code))
+            print((result_string).format(url, response.status_code))
         time.sleep(delay) 
             
     except (requests.exceptions.Timeout, 
             requests.exceptions.ConnectionError,
             requests.exceptions.ProxyError) as e:
-        print(f"Error for {url} with proxy {proxy['http'].split('socks5://')[1]}, remove from list...")
-        proxy_failed = True
-        time.sleep(delay) 
+        if proxy:
+            print(f"Error for {url} with proxy {proxy['http'].split('socks5://')[1]}, remove from list...")
+            proxy_failed = True
+        else: 
+            print(f'Error for {url} with tor {rt.check_ip()}')
+            time.sleep(delay) 
         
     return response, proxy_failed
 
@@ -174,9 +177,6 @@ def main():
             proxy_list = [line.strip() for line in file.readlines()]
     else:
         proxy_list = []
-
-    if args.tor_proxy:
-        set_tor_proxy()
 
     run_fuzz(args.url, wordlist, legitimate, proxy_list, delay_range, args.output, args.tor_proxy)
 
