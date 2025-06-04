@@ -48,8 +48,7 @@ def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_pro
             dir_counter += 1
     else:
         directories.extend(wordlist)
-    
-    start_time = time.time()
+
     delay = None
     request_counter = 0
     change_threshold = random.randint(*change_interval)  
@@ -91,12 +90,14 @@ def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_pro
                     else:
                         print("No more proxies available!")
                         break
+                else:
+                    rt.new_id()
             else:
                 break
             
             
-        if d not in legitimate and response.status_code != 404:
-            output_file.write(f"URL: {full_url} | Status: {response.status_code} | Text:\n{response.text}")
+        if d not in legitimate:
+            output_file.write(f"DIR: {d} | Status: {response.status_code} | Text:\n{response.text}")
             output_file.flush()
     
     output_file.close()
@@ -137,6 +138,7 @@ def craft_request(rt, url, delay, proxy, user_agent):
             proxy_failed = True
         else: 
             print(f'Error for {url} with tor {rt.check_ip()}')
+            proxy_failed = True
             time.sleep(delay) 
         
     return response, proxy_failed
