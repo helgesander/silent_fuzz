@@ -53,7 +53,7 @@ def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_pro
     delay = None
     request_counter = 0
     change_threshold = random.randint(*change_interval)  
-    
+
     rt = None
 
     if tor_proxy:
@@ -143,7 +143,7 @@ def craft_request(rt, url, delay, proxy, user_agent):
 
 def init_cli() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog='silent_fuzz',
+        prog='silent_fuzz.py',
     )
     parser.add_argument('-u', '--url', help='Url for fuzzing directories', required=True)
     parser.add_argument('-w', '--wordlist', help='Wordlist for fuzzing directories', required=True)
@@ -151,7 +151,7 @@ def init_cli() -> argparse.ArgumentParser:
     parser.add_argument('-o', '--output', help='Output file with results', required=True)
     parser.add_argument('-p', '--proxy-list', help='List with proxies')
     parser.add_argument('--tor-proxy', help='Use local tor socks server', action='store_true')
-    parser.add_argument('--delay', help='Range of delays between requests (min,max)', type=str, default='1,5')
+    parser.add_argument('--delay', help='Range of delays between requests (min,max), default 1,5', type=str, default='1,5')
 
     return parser
 
