@@ -29,11 +29,19 @@ def create_proxy_dict(proxy_address):
     return {
         'http': proxy_url,
         'https': proxy_url
-    }   
+    }  
+
+def write_to_file(data, output):
+    with open(output, "w", encoding='utf-8') as f:
+        for item in data:
+            f.write(f'DIR: {item['dir']} | Status {item['status_code']} | Length: {item['content_length']}\n')
+
 
 def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_proxy=False, change_interval=(5, 25)):
     directories = []
     output_file = open(output, 'w')
+    results = []
+    sorted_results = []
 
     
     if len(legitimate) > 0:
@@ -79,6 +87,7 @@ def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_pro
                 proxy_dict = create_proxy_dict(current_proxy)
             
             response, proxy_is_failed = craft_request(rt, full_url, delay, proxy_dict, get_random_user_agent())
+
             request_counter += 1
             
             if proxy_is_failed:
@@ -93,12 +102,16 @@ def run_fuzz(url, wordlist, legitimate, proxy_list, delay_range, output, tor_pro
                 else:
                     rt.new_id()
             else:
+                if d not in legitimate:
+                    results.append({
+                        'dir': d,
+                        'status_code': response.status_code,
+                        'content_length': len(response.text),
+                    })
                 break
             
-            
-        if d not in legitimate:
-            output_file.write(f"DIR: {d} | Status: {response.status_code} | Text:\n{response.text}")
-            output_file.flush()
+    sorted_results = sorted(results, key=lambda x: (x['status_code'], x['content_length']))
+    write_to_file(sorted_results, output)
     
     output_file.close()
 
@@ -128,6 +141,7 @@ def craft_request(rt, url, delay, proxy, user_agent):
                 timeout=20
             )
             print((result_string).format(url, response.status_code))
+        print(delay)
         time.sleep(delay) 
             
     except (requests.exceptions.Timeout, 
