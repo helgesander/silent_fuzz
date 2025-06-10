@@ -141,7 +141,6 @@ def craft_request(rt, url, delay, proxy, user_agent):
                 timeout=20
             )
             print((result_string).format(url, response.status_code))
-        print(delay)
         time.sleep(delay) 
             
     except (requests.exceptions.Timeout, 
